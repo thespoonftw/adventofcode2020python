@@ -1,10 +1,11 @@
+from tkinter import E
 from common import day
 from enum import Enum
 import math
 import numpy
 
 def part1(lines) -> int: 
-    return Map(lines).solve()
+    return Map(lines).solvePart1()
 
 def part2(lines) -> int:
     return 0
@@ -14,6 +15,16 @@ class Facing(Enum):
     EAST = 1
     SOUTH = 2
     WEST = 3
+
+class Orienation(Enum):
+    n0r0 = 0 # normal rotation 0
+    n0r1 = 1
+    n0r2 = 2
+    n0r3 = 3
+    m0r0 = 4
+    m0r1 = 5
+    m0r2 = 6
+    m0r3 = 7
     
 
 class Map:
@@ -30,70 +41,43 @@ class Map:
             i += 12
 
 
-    def solve(self) -> int:
-        # find a tile to be our corner
-        corner = self.findACorner()
-        gridSize = int(math.sqrt(len(self.photos)))
-        photoGrid = numpy.full((gridSize, gridSize), None)
-        rotGrid = numpy.full((gridSize, gridSize), 0)
-        photoGrid[0][0] = corner[0]
-        rotGrid[0][0] = corner[1]
+    def solvePart1(self) -> int:
+        corners = self.findCorners()
+        multiplier = 1
+        for corner in corners:
+            multiplier *= corner.id
+        return multiplier
 
-        a = self.findMatch(corner[0], corner[1], 0)
-        b = self.findMatch(corner[0], corner[1], 1)
-        c = self.findMatch(corner[0], corner[1], 2)
-        d = self.findMatch(corner[0], corner[1], 3)
-
-
-
-        for index in range(1, gridSize):
-            prevPhoto = photoGrid[index - 1, 0]
-            prevRot = rotGrid[index - 1, 0]
-            match = self.findMatch(prevPhoto, prevRot, 1)
-            x = 0
-
-        #check = self.doEdgesMatch(self.photos[0], self.photos[1], 0, 0, 3)
-
-        return 0 
-
-    def findMatch(self, photo1, rot1, dir):
+    def findMatch(self, photo1, ori1, dir):
         for photo2 in self.photos:
             if (photo1 == photo2):
                 continue
-            for rot2 in range(4):
-                if self.doEdgesMatch(photo1, photo2, rot1, rot2, dir):
-                    return photo2, rot2
+            for ori2 in range(8):
+                if self.doEdgesMatch(photo1, photo2, ori1, ori2, dir):
+                    return photo2, ori2
 
 
-    def doEdgesMatch(self, photo1, photo2, rotation1, rotation2, direction):
-        edge1 = photo1.getEdge(direction, rotation1)
-        edge2 = list(reversed(photo2.getEdge((direction + 2) % 4, rotation2)))
+    def doEdgesMatch(self, photo1, photo2, orientation1, orientation2, direction):
+        edge1 = photo1.getEdge(direction, orientation1)
+        oppositeDirection = (direction + 2) % 4
+        edge2 = list(reversed(photo2.getEdge(oppositeDirection, orientation2)))
         return edge1 == edge2      
 
-    def findACorner(self) -> int:
+    def findCorners(self) -> int:
+        returner = list()
         for photo1 in self.photos:
-            neighbours = list()
+            neighbours = 0
             for photo2 in self.photos:
                 if (photo1 == photo2):
                     continue
-                for dir in range(4):
-                    for rot in range(4):
-                        if self.doEdgesMatch(photo1, photo2, 0, rot, dir):
-                            neighbours.append(dir)
-            if (len(neighbours) == 2):
-                break
+                for edge1 in photo1.allEdges:
+                    for edge2 in photo2.allEdges:
+                        if edge1 == edge2:
+                            neighbours += 1
+            if (neighbours == 4):
+                returner.append(photo1)
 
-        neighbours.sort()
-        if (neighbours == [0, 1]):
-            return photo1, 0
-        elif (neighbours == [1, 2]):
-            return photo1, 1
-        elif (neighbours == [2, 3]):
-            return photo1, 2
-        elif (neighbours == [0, 3]):
-            return photo1, 3
-
-        return -1
+        return returner
 
 
 
@@ -103,18 +87,22 @@ class Photo:
         self.id = id
         self.lines = lines
 
-    def getEdge(self, edge, rotation):
-        index = (edge - rotation) % 4
-        if (index == 0): # north
-            return [char for char in self.lines[0]]
-        elif (index == 1): # east
-            return [line[-1] for line in self.lines]
-        elif (index == 2): # south
-            return [char for char in reversed(self.lines[9])]
-        elif (index == 3): # west
-            return [line[0] for line in reversed(self.lines)]
-        x = 0
-        
+        northEdge = ''.join([char for char in self.lines[0]])
+        eastEdge = ''.join([line[-1] for line in self.lines])
+        southEdge = ''.join([char for char in list(reversed(self.lines[9]))])
+        westEdge = ''.join([line[0] for line in list(reversed(self.lines))])
+
+        self.normalEdges = [ northEdge, eastEdge, southEdge, westEdge ]
+        self.mirrorEdges = [ northEdge[::-1], westEdge[::-1], southEdge[::-1], eastEdge[::-1] ]
+        self.allEdges = self.normalEdges + self.mirrorEdges
+
+    def getEdge(self, index, orientation):
+        if (orientation < 4):
+            mod = (index - orientation) % 4
+            return self.normalEdges[mod]
+        else:
+            mod = (index + orientation) % 4
+            return self.mirrorEdges[mod]
         
 
 
